@@ -1,27 +1,16 @@
-Looking at your code, the intention seems to be having a `Settings` property that is an `ObservableObject` nested inside your `MainPageViewModel` which is also an `ObservableObject`. In xaml, the way you would bind to this is by referencing the nested object, e.g. `Button <FontAttributes="{Binding Settings.FontSetting}">`.
+Your understanding of the nested binding seems to be correct! It _should_ work that way, and the minimal reproducible example below shows that it _does_ work that way.
 
+There might be a nuanced distinction to be made between `ObservableProperty` and `ObservableObject`. The `Settings` property doesn't need to be observable unless the settings instance itself is going to change. If you have multiple users, and they have individual profile settings, _then_ you would need to notify but otherwise it just points to the "one and only" instance of `SettingsClass`.
 
-#### Main Page VM
+The code below is tested and it works. The hope is that you might be able to spot a discrepancy between this implementation and your own.
+___
 
-``` 
-partial class MainPageViewModel : ObservableObject
+##### VM
+
+```
+class MainPageViewModel : ObservableObject
 {
-    public MainPageViewModel()
-    {
-        ButtonClickedCommand = new RelayCommand(() =>
-        {
-            _count++;
-            string plural = _count > 1 ? "s" : string.Empty;
-            Text = $"You clicked {_count} time{plural}";
-        });
-    }
-    int _count = 0;
-    public ICommand ButtonClickedCommand { get; }
-
-    [ObservableProperty]
-    string _text = "Click Me";
-
-    // This 'is' an ObservableObject because it provides INotifyPropertyChanged.
+    // Settings 'is' an ObservableObject because it provides INotifyPropertyChanged.
     // It 'is not' an ObservableProperty however, unless you're swapping out settings
     // en masse e.g. because you have Profiles with their own individual Settings.
     // ==================================================================================
@@ -29,40 +18,70 @@ partial class MainPageViewModel : ObservableObject
 }
 ```
 
-___
+##### Settings Class
 
-#### Settings Class
+In this sample, we'll react to changes of `ServerPath` to trigger UI updates of `UpdatePath` and text color.
 
 ```
 partial class SettingsClass : ObservableObject
 {
     [ObservableProperty]
-    bool _useItalic;
-
-    [ObservableProperty]
-    FontStyle _fontSetting;
-
-    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
-    {
-        base.OnPropertyChanged(e);
-        switch (e.PropertyName)
-        {
-            case nameof(UseItalic):
-                FontSetting = UseItalic ? FontStyles.Italic : FontStyles.Normal;
-                break;
-        }
-    }
+    private string _serverPath = String.Empty;
 }
 ```
+
+#### Converted property values
+
+There is a textbox on the UI that generates an `UpdatePath` based on changes to `ServerPath`.
+
+##### UpdatePath
+
+This `IValueConverter` sample class derives `UpdatePath` from changes to `ServerPath`.
+
+```
+class UpdatePathFromServerPath : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is string serverPath && !string.IsNullOrWhiteSpace(serverPath))
+        {
+            return $"{serverPath}/Updates/OneClick/package.htm";
+        }
+        else
+        {
+            return "Waiting for server path...";
+        }
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => 
+        throw new NotImplementedException();
+}
+```
+
+##### Text Color
+
+This `IValueConverter` sample class derives `Forecolor` from changes to `ServerPath`.
+
+```
+class EmptyToColor : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is string @string)
+        {
+            return string.IsNullOrEmpty(@string) ? Brushes.Green: Brushes.Red;
+        }
+        else return Colors.Black;
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotImplementedException();
+}
+```
+
+[![ui update example][1]][1]
 
 ___
 
 #### Xaml
-
-Here, the `Text` of the button is a property of `MainPageViewModel`, but the _style_ of the text on the button comes from `MainPageViewModel.Settings.FontSetting`.
-
-
-[![button styled using a settings property][2]][2]
 
 ```
 <Window x:Class="wpf_nested_notify.MainWindow"
@@ -77,65 +96,56 @@ Here, the `Text` of the button is a property of `MainPageViewModel`, but the _st
     <Window.DataContext>
         <local:MainPageViewModel/>
     </Window.DataContext>
+    <Window.Resources>
+        <local:UpdatePathFromServerPath x:Key="UpdatePathFromServerPath"/>
+        <local:EmptyToColor x:Key="EmptyToColor"/>
+    </Window.Resources>
     <Grid 
         VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="4*" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <StackPanel
             Grid.Column="1"
             Orientation="Vertical"
             VerticalAlignment="Center">
-            <Button
-                Content="{Binding Text}" 
-                FontStyle="{Binding Settings.FontSetting}" 
-                ToolTip="Counts the number of times you click"
-                Command="{Binding ButtonClickedCommand}"
-                HorizontalAlignment="Stretch"
-                Padding="5"
-                FontSize="20">
-                <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                        <Border 
-                            Background="{TemplateBinding Background}" 
-                            BorderBrush="{TemplateBinding BorderBrush}" 
-                            BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Button.Template>
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Background" Value="Purple"/>
-                        <Setter Property="Foreground" Value="White"/>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="Lavender"/>
-                                <Setter Property="Foreground" Value="Purple"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-            </Button>
-            <Grid Height="100" Margin="0,20,0,0">
-                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Margin="0,20,0,0" Background="White">
-                    <Grid 
+            <TextBox 
+                Text="{Binding Settings.ServerPath, UpdateSourceTrigger=PropertyChanged}"
+                Margin="0,20"
+                MinHeight="30"
+                VerticalContentAlignment="Bottom"/>            
+            <Grid Height="175" Margin="0,0,0,0">
+                <Border
+                    BorderBrush="Gray" 
+                    BorderThickness="1" 
+                    CornerRadius="5" 
+                    Margin="0,20"
+                    Background="White">
+                    <StackPanel 
                         Margin="10,10" >
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="30" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <CheckBox Grid.Column="0" IsChecked="{Binding Settings.UseItalic}"  VerticalAlignment="Center"/>
-                        <Label Grid.Column="1" Padding="5,0" Content="Use Italics" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
-                    </Grid>
+                        <Label 
+                            Content="{Binding Settings.ServerPath, UpdateSourceTrigger=PropertyChanged}"
+                            Margin="0,10" 
+                            Background="Azure"
+                            MinHeight="25"/>
+                        <TextBox 
+                            Text="{Binding Settings.ServerPath, Converter={StaticResource UpdatePathFromServerPath} }" 
+                            Margin="0,10" MinHeight="25" 
+                            IsReadOnly="True"
+                            Background="Azure"
+                            FontSize="12"
+                            Foreground="{Binding Settings.ServerPath, Converter={StaticResource EmptyToColor}  }"
+                            VerticalContentAlignment="Center">
+                        </TextBox>
+                    </StackPanel>
                 </Border>
                 <Label
                     Margin="5,2,0,0"
                     Background="White"
                     Padding="5"
-                    Content="Settings"
+                    Content="Loopback"
                     VerticalAlignment="Top"
                     HorizontalAlignment="Left"/>
             </Grid>
@@ -143,41 +153,5 @@ Here, the `Text` of the button is a property of `MainPageViewModel`, but the _st
     </Grid>
 </Window>
 ```
-___
 
-##### Binding (in general)
-
-Finally, based on your comment:
-
-> I don’t have a deep understanding of how everything works yet
-
-In essence, all that's really being said when something is an observable object is that it implements `INotifyPropertyChanged`, and it's trivial to do this directly. Perhaps it will demystify things to see how one might implement an observable `Text` property without the toolkit.
-
-```
-class ObservableObjectFromScratch : INotifyPropertyChanged
-{
-    public string Text
-    {
-        get => _text;
-        set
-        {
-            if (!Equals(_text, value))
-            {
-                _text = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-    string _text = string.Empty;
-
-    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-    }
-    public event PropertyChangedEventHandler? PropertyChanged;
-}
-```
-
-
-  [1]: https://i.sstatic.net/EnbidmZP.png
-  [2]: https://i.sstatic.net/1KYg2Rp3.png
+  [1]: https://i.sstatic.net/f5SAKu46.png

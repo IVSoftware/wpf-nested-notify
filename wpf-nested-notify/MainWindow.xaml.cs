@@ -1,35 +1,22 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace wpf_nested_notify
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         public MainWindow() => InitializeComponent();
     }
-    partial class MainPageViewModel : ObservableObject
+    class MainPageViewModel : ObservableObject
     {
-        public MainPageViewModel()
-        {
-            ButtonClickedCommand = new RelayCommand(() =>
-            {
-                _count++;
-                string plural = _count > 1 ? "s" : string.Empty;
-                Text = $"You clicked {_count} time{plural}";
-            });
-        }
-        int _count = 0;
-        public ICommand ButtonClickedCommand { get; }
-
-        [ObservableProperty]
-        string _text = "Click Me";
-
         // This 'is' an ObservableObject because it provides INotifyPropertyChanged.
         // It 'is not' an ObservableProperty however, unless you're swapping out settings
         // en masse e.g. because you have Profiles with their own individual Settings.
@@ -39,20 +26,35 @@ namespace wpf_nested_notify
     partial class SettingsClass : ObservableObject
     {
         [ObservableProperty]
-        bool _useItalic;
-
-        [ObservableProperty]
-        FontStyle _fontSetting;
-
-        protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+        private string _serverPath = String.Empty;
+    }
+    class UpdatePathFromServerPath : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            base.OnPropertyChanged(e);
-            switch (e.PropertyName)
+            if (value is string serverPath && !string.IsNullOrWhiteSpace(serverPath))
             {
-                case nameof(UseItalic):
-                    FontSetting = UseItalic ? FontStyles.Italic : FontStyles.Normal;
-                    break;
+                return $"{serverPath}/Updates/OneClick/package.htm";
+            }
+            else
+            {
+                return "Waiting for server path...";
             }
         }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => 
+            throw new NotImplementedException();
+    }
+    class EmptyToColor : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string @string)
+            {
+                return string.IsNullOrEmpty(@string) ? Brushes.Green: Brushes.Red;
+            }
+            else return Colors.Black;
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            throw new NotImplementedException();
     }
 }

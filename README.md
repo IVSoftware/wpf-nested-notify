@@ -61,6 +61,9 @@ ___
 
 Here, the `Text` of the button is a property of `MainPageViewModel`, but the _style_ of the text on the button comes from `MainPageViewModel.Settings.FontSetting`.
 
+
+[![button styled using a settings property][2]][2]
+
 ```
 <Window x:Class="wpf_nested_notify.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -69,11 +72,11 @@ Here, the `Text` of the button is a property of `MainPageViewModel`, but the _st
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:wpf_nested_notify"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="MainWindow" Width="500" Height="300"
+        FontSize="18">
     <Window.DataContext>
         <local:MainPageViewModel/>
     </Window.DataContext>
-
     <Grid 
         VerticalAlignment="Stretch">
         <Grid.ColumnDefinitions>
@@ -85,8 +88,6 @@ Here, the `Text` of the button is a property of `MainPageViewModel`, but the _st
             Grid.Column="1"
             Orientation="Vertical"
             VerticalAlignment="Center">
-
-            <!-- Button -->
             <Button
                 Content="{Binding Text}" 
                 FontStyle="{Binding Settings.FontSetting}" 
@@ -94,29 +95,47 @@ Here, the `Text` of the button is a property of `MainPageViewModel`, but the _st
                 Command="{Binding ButtonClickedCommand}"
                 HorizontalAlignment="Stretch"
                 Padding="5"
-                FontSize="14"/>
-
-            <!-- Frame with Grid and CheckBox -->
+                FontSize="20">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border 
+                            Background="{TemplateBinding Background}" 
+                            BorderBrush="{TemplateBinding BorderBrush}" 
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Background" Value="Purple"/>
+                        <Setter Property="Foreground" Value="White"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="Lavender"/>
+                                <Setter Property="Foreground" Value="Purple"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
             <Grid Height="100" Margin="0,20,0,0">
                 <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Margin="0,20,0,0" Background="White">
                     <Grid 
-                        Margin="5,15" >
+                        Margin="10,10" >
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="25" />
+                            <ColumnDefinition Width="30" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <CheckBox Grid.Column="0" IsChecked="{Binding Settings.UseItalic}"  VerticalAlignment="Center"/>
                         <Label Grid.Column="1" Padding="5,0" Content="Use Italics" VerticalAlignment="Center" VerticalContentAlignment="Center"/>
                     </Grid>
                 </Border>
-
-                <!-- Label for Settings -->
                 <Label
-                    Margin="10,5,0,0"
+                    Margin="5,2,0,0"
                     Background="White"
                     Padding="5"
                     Content="Settings"
-                    Height="30"
                     VerticalAlignment="Top"
                     HorizontalAlignment="Left"/>
             </Grid>
@@ -124,9 +143,6 @@ Here, the `Text` of the button is a property of `MainPageViewModel`, but the _st
     </Grid>
 </Window>
 ```
-
-[![button styled using a settings property][2]][2]
-
 ___
 
 ##### Binding (in general)
@@ -162,4 +178,6 @@ class ObservableObjectFromScratch : INotifyPropertyChanged
 }
 ```
 
-  [2]: https://i.sstatic.net/EnbidmZP.png
+
+  [1]: https://i.sstatic.net/EnbidmZP.png
+  [2]: https://i.sstatic.net/1KYg2Rp3.png

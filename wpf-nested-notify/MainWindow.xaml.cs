@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using static System.Net.WebRequestMethods;
 
 namespace wpf_nested_notify
 {
@@ -20,28 +21,35 @@ namespace wpf_nested_notify
     }
     partial class MainPageViewModel : ObservableObject
     {
-        // This 'is' an ObservableObject because it provides INotifyPropertyChanged.
-        // It 'is not' an ObservableProperty however, unless you're swapping out settings
-        // en masse e.g. because you have Profiles with their own individual Settings.
-        // ==================================================================================
-        public SettingsClass Settings { get; } = new SettingsClass(); // The "one and only" settings object.
+        [ObservableProperty]
+        private SettingsClass _settings;
 
         [ObservableProperty]
         Brush _pingServerIndicatorColor = Brushes.Gray;
 
-        public MainPageViewModel()
-        {
-            Settings.PropertyChanged += (sender, e) =>
-            {
-                switch (e.PropertyName)
-                {
-                    case nameof(Settings.ServerPath): 
-                        _ = PingServer(); 
-                        break;
-                }
-            };
-        }
+        public MainPageViewModel() => Settings = new SettingsClass();
 
+        // Respond to a new instance of Settings e.g. user profile changed.
+        protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+        {
+            base.OnPropertyChanged(e);
+            switch (e.PropertyName)
+            {
+                case nameof(Settings):
+                    Settings.PropertyChanged -= OnSettingsPropertyChanged;
+                    Settings.PropertyChanged += OnSettingsPropertyChanged;
+                    break;
+            }
+        }
+        private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
+            {
+                case nameof(Settings.ServerPath):
+                    _ = PingServer();
+                    break;
+            }
+        }
         private async Task PingServer()
         {
             var url = 
@@ -58,20 +66,11 @@ namespace wpf_nested_notify
                     try
                     {
                         PingServerIndicatorColor = (
-                            await ping.SendPingAsync(
-                                hostNameOrAddress: url, 
-                                timeout: 5000,
-                                buffer: Encoding.ASCII.GetBytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
-                                options: new PingOptions { DontFragment = true }
-                             ))
+                            await ping.SendPingAsync(url))
                             .Status == IPStatus.Success ?
                                 Brushes.LightGreen : Brushes.Red;
                     }
-                    catch (PingException pex)
-                    {
-                        PingServerIndicatorColor = Brushes.Red; 
-                    }
-                    catch (Exception ex)
+                    catch
                     {  
                         PingServerIndicatorColor = Brushes.Red;
                     }

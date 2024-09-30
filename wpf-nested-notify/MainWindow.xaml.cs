@@ -3,7 +3,10 @@ using CommunityToolkit.Mvvm.Input;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -15,13 +18,68 @@ namespace wpf_nested_notify
     {
         public MainWindow() => InitializeComponent();
     }
-    class MainPageViewModel : ObservableObject
+    partial class MainPageViewModel : ObservableObject
     {
         // This 'is' an ObservableObject because it provides INotifyPropertyChanged.
         // It 'is not' an ObservableProperty however, unless you're swapping out settings
         // en masse e.g. because you have Profiles with their own individual Settings.
         // ==================================================================================
         public SettingsClass Settings { get; } = new SettingsClass(); // The "one and only" settings object.
+
+        [ObservableProperty]
+        Brush _pingServerIndicatorColor = Brushes.Gray;
+
+        public MainPageViewModel()
+        {
+            Settings.PropertyChanged += (sender, e) =>
+            {
+                switch (e.PropertyName)
+                {
+                    case nameof(Settings.ServerPath): 
+                        _ = PingServer(); 
+                        break;
+                }
+            };
+        }
+
+        private async Task PingServer()
+        {
+            var url = 
+                Settings
+                .ServerPath
+                .Replace("http://", string.Empty, StringComparison.OrdinalIgnoreCase)
+                .Replace("https://", string.Empty, StringComparison.OrdinalIgnoreCase);
+            if(url.Replace("www.", string.Empty).Count(_ => _ == '.') >= 1 &&
+                Path.GetExtension(url).Length >= 3)
+            {
+                PingServerIndicatorColor = Brushes.Yellow;
+                using (Ping ping = new Ping())
+                {
+                    try
+                    {
+                        PingServerIndicatorColor = (
+                            await ping.SendPingAsync(
+                                hostNameOrAddress: url, 
+                                timeout: 5000,
+                                buffer: Encoding.ASCII.GetBytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+                                options: new PingOptions { DontFragment = true }
+                             ))
+                            .Status == IPStatus.Success ?
+                                Brushes.LightGreen : Brushes.Red;
+                    }
+                    catch (PingException pex)
+                    {
+                        // Handle Ping specific exceptions
+                        PingServerIndicatorColor = Brushes.Red; // Connection failed
+                    }
+                    catch (Exception ex)
+                    {  
+                        PingServerIndicatorColor = Brushes.Red;
+                    }
+                }
+            }
+            else PingServerIndicatorColor = Brushes.Salmon;
+        }
     }
     partial class SettingsClass : ObservableObject
     {

@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:wpf_nested_notify"
         mc:Ignorable="d"
-        Title="MainWindow" Width="500" Height="300"
+        Title="MainWindow" Width="500" Height="350"
         FontSize="18">
     <Window.DataContext>
         <local:MainPageViewModel/>
@@ -74,6 +74,14 @@
                     VerticalAlignment="Top"
                     HorizontalAlignment="Left"/>
             </Grid>
+            <Button 
+                Height="30"
+                Padding="5"
+                Width="100"
+                FontSize="11"
+                Content="New Settings"
+                Command="{Binding NewSettingsTestCommand}"
+                Background="LightGreen" />
         </StackPanel>
     </Grid>
 </Window>

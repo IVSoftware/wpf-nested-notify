@@ -27,7 +27,14 @@ namespace wpf_nested_notify
         [ObservableProperty]
         Brush _pingServerIndicatorColor = Brushes.Gray;
 
-        public MainPageViewModel() => Settings = new SettingsClass();
+        public MainPageViewModel()
+        {
+            Settings = new SettingsClass();
+            NewSettingsTestCommand = new RelayCommand(() =>
+            {
+                Settings = new SettingsClass();
+            });
+        }
 
         // Respond to a new instance of Settings e.g. user profile changed.
         protected override void OnPropertyChanged(PropertyChangedEventArgs e)
@@ -78,6 +85,7 @@ namespace wpf_nested_notify
             }
             else PingServerIndicatorColor = Brushes.Salmon;
         }
+        public ICommand NewSettingsTestCommand { get; }
     }
     partial class SettingsClass : ObservableObject
     {

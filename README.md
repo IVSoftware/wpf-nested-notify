@@ -1,26 +1,98 @@
-Your understanding of the nested binding seems to be correct! It _should_ work that way, and the minimal reproducible example below shows that it _does_ work that way.
+When you say this, it's a true statement:
 
-There might be a nuanced distinction to be made between `ObservableProperty` and `ObservableObject`. The `Settings` property doesn't need to be observable unless the settings instance itself is going to change. If you have multiple users, and they have individual profile settings, _then_ you would need to notify but otherwise it just points to the "one and only" instance of `SettingsClass`.
+> `ViewModel` does not get notified about these [changes in Settings...] 
 
-The code below is tested and it works. The hope is that you might be able to spot a discrepancy between this implementation and your own.
+When you say this, it's a _partially_ true statement:
+
+> I expected the [ObservableProperty] attribute to handle this automatically.
+
+True in the sense that if there are bindings like `{Binding Server.ServerPath}` in the xaml, and you swap to a new instance of `Settings`, the bindings in the UI _will_ now respond to changes in the new instance. So it _is_ automatic in that respect.
+___
+
+That said, it sounds as though you want **internal logic in the view model** to respond directly to `PropertyChanged` of the `Settings`, like in the sample below where we `Ping()` in response to a new value for `ServerPath`. Nothing about that is going to be automatic. Your code is showing exactly the right approach, unhooking the old instance's `PropertyChanged` event and setting a hook to the new instance, calling an internal handler so that the business logic in the VM will respond. 
+
+In many cases, though, the wiring for "complex interactions" can be done in xaml using `IValueConverter` as is the case for the generated update path and text color in this UI.
+
+I've reread your post about a hundred times now to see why _the UI doesn't update correctly in some cases_. A slightly modified approach to the VM is shown here, but there doesn't seem to be anything fundamentally wrong with how you're looking at this.
 ___
 
 ##### VM
 
 ```
-class MainPageViewModel : ObservableObject
+partial class MainPageViewModel : ObservableObject
 {
-    // Settings 'is' an ObservableObject because it provides INotifyPropertyChanged.
-    // It 'is not' an ObservableProperty however, unless you're swapping out settings
-    // en masse e.g. because you have Profiles with their own individual Settings.
-    // ==================================================================================
-    public SettingsClass Settings { get; } = new SettingsClass(); // The "one and only" settings object.
+    [ObservableProperty]
+    private SettingsClass _settings;
+
+    [ObservableProperty]
+    Brush _pingServerIndicatorColor = Brushes.Gray;
+
+    public MainPageViewModel()
+    {
+        Settings = new SettingsClass();
+        NewSettingsTestCommand = new RelayCommand(() =>
+        {
+            Settings = new SettingsClass();
+        });
+    }
+
+    // Respond to a new instance of Settings e.g. user profile changed.
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        switch (e.PropertyName)
+        {
+            case nameof(Settings):
+                Settings.PropertyChanged -= OnSettingsPropertyChanged;
+                Settings.PropertyChanged += OnSettingsPropertyChanged;
+                break;
+        }
+    }
+    private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(Settings.ServerPath):
+                _ = PingServer();
+                break;
+        }
+    }
+    private async Task PingServer()
+    {
+        var url = 
+            Settings
+            .ServerPath
+            .Replace("http://", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace("https://", string.Empty, StringComparison.OrdinalIgnoreCase);
+        if( new[] { ".com", ".net", "org" }.Contains(
+            Path.GetExtension(url.Replace("www.", string.Empty))))
+        {
+            PingServerIndicatorColor = Brushes.Yellow;
+            using (Ping ping = new Ping())
+            {
+                try
+                {
+                    PingServerIndicatorColor = (
+                        await ping.SendPingAsync(url))
+                        .Status == IPStatus.Success ?
+                            Brushes.LightGreen : Brushes.Red;
+                }
+                catch
+                {  
+                    PingServerIndicatorColor = Brushes.Red;
+                }
+            }
+        }
+        else PingServerIndicatorColor = Brushes.Salmon;
+    }
+    public ICommand NewSettingsTestCommand { get; }
 }
 ```
+___
 
 ##### Settings Class
 
-In this sample, we'll react to changes of `ServerPath` to trigger UI updates of `UpdatePath` and text color.
+In this sample, we'll react to changes of `ServerPath` to trigger UI updates of `UpdatePath` and text color. What this demonstrates is that the property change notifications of the nested class are definitely available and functional as binding targets in the xaml scheme.
 
 ```
 partial class SettingsClass : ObservableObject
@@ -29,6 +101,7 @@ partial class SettingsClass : ObservableObject
     private string _serverPath = String.Empty;
 }
 ```
+___
 
 #### Converted property values
 
@@ -91,7 +164,7 @@ ___
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:wpf_nested_notify"
         mc:Ignorable="d"
-        Title="MainWindow" Width="500" Height="300"
+        Title="MainWindow" Width="500" Height="350"
         FontSize="18">
     <Window.DataContext>
         <local:MainPageViewModel/>
@@ -149,9 +222,18 @@ ___
                     VerticalAlignment="Top"
                     HorizontalAlignment="Left"/>
             </Grid>
+            <Button 
+                Height="30"
+                Padding="5"
+                Width="100"
+                FontSize="11"
+                Content="New Settings"
+                Command="{Binding NewSettingsTestCommand}"
+                Background="LightGreen" />
         </StackPanel>
     </Grid>
 </Window>
 ```
 
-  [1]: https://i.sstatic.net/f5SAKu46.png
+
+  [1]: https://i.sstatic.net/M6LbzAwp.png

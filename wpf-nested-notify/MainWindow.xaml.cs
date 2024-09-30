@@ -49,8 +49,8 @@ namespace wpf_nested_notify
                 .ServerPath
                 .Replace("http://", string.Empty, StringComparison.OrdinalIgnoreCase)
                 .Replace("https://", string.Empty, StringComparison.OrdinalIgnoreCase);
-            if(url.Replace("www.", string.Empty).Count(_ => _ == '.') >= 1 &&
-                Path.GetExtension(url).Length >= 3)
+            if( new[] { ".com", ".net", "org" }.Contains(
+                Path.GetExtension(url.Replace("www.", string.Empty))))
             {
                 PingServerIndicatorColor = Brushes.Yellow;
                 using (Ping ping = new Ping())
@@ -69,8 +69,7 @@ namespace wpf_nested_notify
                     }
                     catch (PingException pex)
                     {
-                        // Handle Ping specific exceptions
-                        PingServerIndicatorColor = Brushes.Red; // Connection failed
+                        PingServerIndicatorColor = Brushes.Red; 
                     }
                     catch (Exception ex)
                     {  
